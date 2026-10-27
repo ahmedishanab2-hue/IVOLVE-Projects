@@ -169,3 +169,24 @@ kubectl describe resourcequotas ivolvequota -n ivolve
 
 **Result:** The `ivolve` namespace was created, the `ivolvequota` ResourceQuota was configured with a limit of three Pods, and a fourth Pod creation attempt was rejected as expected.
 
+
+shanab@Shanab:~/ivolve/IVOLVE-Projects/k8s/Lab11$ cat namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ivolve
+spec: {}
+status: {}
+shanab@Shanab:~/ivolve/IVOLVE-Projects/k8s/Lab11$ cat resourcequota.yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ivolvequota
+  namespace: ivolve
+spec:
+  hard:
+    pods: "3"
+status: {}
+shanab@Shanab:~/ivolve/IVOLVE-Projects/k8s/Lab11$
+
+
