@@ -9,8 +9,8 @@ services:
       - "3000:3000"
     environment:
       DB_HOST: db
-      DB_User: root
-      DB_password: root123
+      DB_USER: root
+      DB_PASSWORD: root123
       DB_NAME: ivolve
     volumes:
       - app_logs:/app/logs
@@ -46,4 +46,3 @@ networks:
 volumes:
   app_logs:
   db_data:
-
