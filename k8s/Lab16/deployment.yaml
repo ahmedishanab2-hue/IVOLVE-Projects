@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ivolveapp
+  namespace: ivolve
+  labels:
+    app: ivolveapp
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: ivolveapp
+  template:
+    metadata:
+      labels:
+        app: ivolveapp
+    spec:
+      nodeSelector:
+        project: ivolve
+      tolerations:
+        - key: workload
+          operator: Equal
+          value: ivolveApp
+          effect: NoSchedule
+      initContainers:
+        - name: init-db
+          image: mysql:8.0
+          envFrom:
+            - configMapRef:
+                name: ivolvecm
+            - secretRef:
+                name: ivolvesecret
+          command: ["sh", "-c"]
+          args:
+            - |
+              until mysqladmin ping -h "$DB_HOST" -uroot -p"$MYSQL_ROOT_PASSWORD" --silent; do
+                echo "waiting for MySQL..."; sleep 3
+              done
+              mysql -h "$DB_HOST" -uroot -p"$MYSQL_ROOT_PASSWORD" -e "
+                CREATE DATABASE IF NOT EXISTS ivolve;
+                CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$DB_PASSWORD';
+                GRANT ALL PRIVILEGES ON ivolve.* TO '$DB_USER'@'%';
+                FLUSH PRIVILEGES;"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      containers:
+        - name: ivolveapp
+          image: ahmedshanab215/ivolveapp:latest
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: ivolvecm
+            - secretRef:
+                name: ivolvesecret
+          # Lab 16: CPU and memory requests/limits
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+      volumes:
+        - name: logs
+          persistentVolumeClaim:
+            claimName: ivolvepvc
