@@ -1,0 +1,46 @@
+@Library('ivolve-shared-lib') _
+
+pipeline {
+    agent { label 'docker-agent' }
+
+    environment {
+        DOCKER_HUB = 'ahmedshanab215'
+        IMAGE      = "${DOCKER_HUB}/demoapp:${env.BUILD_NUMBER}"
+        KUBE_NS    = 'ivolve'
+    }
+
+    stages {
+        // 1. Unit test + build app
+        stage('Build App') {
+            steps {
+                buildApp()
+            }
+        }
+
+        // 2. Build image, scan, push, delete locally
+        stage('Build Image') {
+            steps {
+                buildImage(image: IMAGE, credentialsId: 'dockerhub-creds')
+            }
+        }
+
+        // 3. Edit deployment file + deploy to cluster
+        stage('Deploy on K8s') {
+            steps {
+                deployOnK8s(image: IMAGE, namespace: KUBE_NS)
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline finished (always).'
+        }
+        success {
+            echo "SUCCESS: ${IMAGE} built, scanned, pushed and deployed."
+        }
+        failure {
+            echo 'FAILURE: check the logs.'
+        }
+    }
+}

@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: demoapp
+  name: demoapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demoapp
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: demoapp
+    spec:
+      containers:
+      - image: ahmedshanab215/demoapp:latest
+        name: demoapp
+        ports:
+        - containerPort: 8080
+        resources: {}
+status: {}
