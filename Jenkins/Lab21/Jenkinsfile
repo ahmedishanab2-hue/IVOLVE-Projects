@@ -1,0 +1,85 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_HUB   = 'ahmedshanab215'
+        IMAGE_NAME   = 'demoapp'
+        IMAGE_TAG    = "${env.BUILD_NUMBER}"
+        FULL_IMAGE   = "${DOCKER_HUB}/${IMAGE_NAME}:${IMAGE_TAG}"
+        KUBE_NS      = 'ivolve'
+    }
+
+    stages {
+        stage('1. Build App') {
+            steps {
+                sh 'mvn -B clean package -DskipTests'
+            }
+        }
+
+        stage('2. Build Docker Image') {
+            steps {
+                sh 'docker build -t $FULL_IMAGE .'
+            }
+        }
+
+        stage('3. Scan Docker Image') {
+            steps {
+                sh 'trivy image --severity HIGH,CRITICAL --exit-code 0 $FULL_IMAGE'
+            }
+        }
+
+        stage('4. Push to DockerHub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
+                                                  usernameVariable: 'DOCKER_USER',
+                                                  passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker push $FULL_IMAGE
+                    '''
+                }
+            }
+        }
+
+        stage('5. Delete Image Locally') {
+            steps {
+                sh 'docker rmi $FULL_IMAGE || true'
+            }
+        }
+
+        stage('6. Update Image in Deployment File') {
+            steps {
+                // regenerate the manifest client-side with the new tag
+                sh '''
+                    kubectl create deployment demoapp \
+                      --image=$FULL_IMAGE \
+                      --port=8080 \
+                      --namespace=$KUBE_NS \
+                      --dry-run=client -o yaml > k8s/deployment.yaml
+                '''
+            }
+        }
+
+        stage('7. Deploy to Kubernetes') {
+            steps {
+                sh 'kubectl apply -f k8s/namespace.yaml'
+                sh 'kubectl apply -f k8s/deployment.yaml'
+                sh 'kubectl apply -f k8s/service.yaml'
+                sh 'kubectl rollout status deployment/demoapp -n $KUBE_NS --timeout=120s'
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline finished (always).'
+            cleanWs()
+        }
+        success {
+            echo "SUCCESS: $FULL_IMAGE built, scanned, pushed and deployed."
+        }
+        failure {
+            echo "FAILURE: pipeline failed at ${currentBuild.currentStage} — check the logs."
+        }
+    }
+}
